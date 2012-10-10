@@ -2,16 +2,26 @@
 from __future__ import unicode_literals
 
 from . import _util
-from ._compat import urljoin, urlopen
+from ._compat import Request, urljoin, urlopen
 from .daum import DaumBlogHandler
 from .egloos import EgloosHandler
 from .naver import NaverBlogHandler
 from .textcube import TextcubeHandler
 from .tistory import TistoryHandler
 
+HANDLER_CLASS = {
+    'daum': DaumBlogHandler,
+    'egloos': EgloosHandler,
+    'naver': NaverBlogHandler,
+    'textcube': TextcubeHandler,
+    'tistory': TistoryHandler,
+}
+
+
 class Blog:
     def __init__(self, url):
-        self.handler = _get_handler_class(url)
+        self.blog_type = _get_blog_type(url)
+        self.handler = HANDLER_CLASS.get(self.blog_type)
         self.url = url
 
     def __iter__(self):
@@ -56,10 +66,15 @@ class Post:
         return "<Post {} {}>".format(self.url, repr(self.title))
 
 
+
 def _get_handler_class(url):
+    return HANDLER_CLASS.get(_get_blog_type(url))
+
+
+def _get_blog_type(url):
     if url.startswith('http://blog.daum.net'):
-        return DaumBlogHandler
-    html = urlopen(url).read()
+        return 'daum'
+    html = urlopen(Request(url, headers={'User-Agent': 'Mozilla/5.0'})).read()
     encoding = 'utf-8'
     try:
         html.decode('cp949')
@@ -69,22 +84,22 @@ def _get_handler_class(url):
     tree = _util._parser.parse(html, encoding=encoding)
     if any('blog.naver.com' in _.get('src', '') for _ in
             tree.xpath('//frame')):
-        return NaverBlogHandler
+        return 'naver'
     if any('blog.naver.com' in _.get('href', '') for _ in
             tree.xpath('//link[@rel="wlwmanifest"]')):
-        return NaverBlogHandler
+        return 'naver'
     css = [_.get('href', '') for _ in tree.xpath('//link[@rel="stylesheet"]')]
     if not css:
         return None
     if any('daumcdn.net/' in _ for _ in css):
-        return TistoryHandler
+        return 'tistory'
     if any('/tc/skin/' in _ for _ in css):
-        return TextcubeHandler
+        return 'textcube'
     if any('/tc/style/' in _ for _ in css):
-        return TextcubeHandler
+        return 'textcube'
     if any('//md.egloos.com/' in _ for _ in css):
-        return EgloosHandler
+        return 'egloos'
     if any('/nversioning/' in _ for _ in css):
-        return NaverBlogHandler
+        return 'naver'
     raise Exception('Unknown type of blog')
     return None

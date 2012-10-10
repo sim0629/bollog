@@ -5,7 +5,7 @@ import re
 
 from . import _util
 from ._base import BlogHandler
-from ._compat import parse_qs, unquote_plus, urlopen, urlparse
+from ._compat import parse_qs, unquote_plus, urljoin, urlopen, urlparse
 
 class NaverBlogHandler(BlogHandler):
     encoding = 'cp949'
@@ -63,3 +63,39 @@ class NaverBlogHandler(BlogHandler):
         if n <= 1:
             return None
         return uri + 'currentPage={}'.format(n - 1)
+
+    @classmethod
+    def get_attachment_urls(cls, url):
+        try:
+            tree = _util.fetch_tree(url, encoding='cp949')
+            frame = tree.xpath('//*[@id="screenFrame"]')[0]
+            src = frame.get('src')
+            if not src:
+                return []
+            url = urljoin('http://blog.naver.com/', src)
+        except IndexError:
+            pass
+        try:
+            tree = _util.fetch_tree(url, encoding='cp949')
+            frame = tree.xpath('//*[@id="mainFrame"]')[0]
+            src = frame.get('src')
+            if not src:
+                return []
+            url = urljoin('http://blog.naver.com/', src)
+        except IndexError:
+            pass
+        html = urlopen(url).read().decode('cp949')
+        m = re.search(r'aPostFiles\[1\] = (.*?);\r\n', html)
+        data = json.loads(m.group(1).replace("'", '"'))
+        result = [_['encodedAttachFileUrl'] for _ in data]
+        tree = _util._parser.parse(html)
+        for a in tree.xpath(
+                '//table[@class="post-body"]//td[@class="bcc"]/div//a'):
+            if a.find('img') is None:
+                continue
+            href = a.get('href', '')
+            if not href:
+                continue
+            href = href.replace(' ', '%20')
+            result.append(href)
+        return result
