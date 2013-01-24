@@ -15,6 +15,7 @@ class TistoryHandler(BlogHandler):
             tree.xpath('//div[@class="wrap_entry"]'),
             tree.xpath('//div[@class="article_holder"]'),
             tree.xpath('//div[@class="postCont"]'),
+            tree.xpath('//div[@class="article_contents"]'),
         ))
         content = candidates[0]
         # TODO: remove tt-plugin, another_category, etc.
